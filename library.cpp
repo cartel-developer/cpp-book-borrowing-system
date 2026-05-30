@@ -1,160 +1,463 @@
 #include <string>
-#include <deque>
+#include <algorithm>
 #include <iostream>
-using namespace std;
-class Book
-{
-private:
-    string BookName;
-    int Book_ID;
-    string Book_Author;
+#include <vector>
+#include <limits>
 
-public:
-    Book(string book_name, string book_author, int book_id)
-    {
-        BookName = book_name;
-        Book_Author = book_author;
-        Book_ID = book_id;
-    }
-    string getBookName() { return BookName; }
-    int getBook_ID() { return Book_ID; }
-    string getBook_Author() { return Book_Author; }
+
+// Entities
+
+struct Book {
+    int bookID{-1};
+    std::string bookName;
+    std::string bookAuthor;
 };
-class patron
-{
-private:
-    string patronName;
-    int patron_SSN;
-    deque<Book> BorrowedBooks;
+
+struct Patron {
+    int patronId{-1};
+    std::string patronName;
+
+};
+
+struct BookPatronItem {
+    int patronId{-1};
+    int bookId{-1};
+};
+
+struct Library {
+
+    std::vector<Book> allBooks;
+    std::vector<Patron> allPatrons;
+    std::vector<BookPatronItem> patronBorrowedBooks;
+
+};
+
+// UseCase
+
+class LibraryRepository {
 
 public:
-    patron(string patron_name, int patron_ssn)
-    {
-        patronName = patron_name;
-        patron_SSN = patron_ssn;
-    }
-    string getPatronName()
-    {
-        return patronName;
-    }
-    int getPatronSSN()
-    {
-        return patron_SSN;
-    }
-    void borrowBook(Book Wantedbook)
-    {
-        BorrowedBooks.push_back(Wantedbook);
-    }
-    bool isBorrowedBook(int BorrowbookID)
-    {
-        for (Book is_borrowed_Book : BorrowedBooks)
-        {
-            if (is_borrowed_Book.getBook_ID() == BorrowbookID)
-            {
-                return true;
-            }
+
+    virtual void newBook(Book newBook) = 0;
+
+    virtual void newPatron(Patron patron) = 0;
+
+    virtual Patron getPatron(int patronId) const = 0;
+
+    virtual Book getBook(int bookId) const = 0;
+
+    virtual bool isPatronExist(int patronId) const = 0;
+
+    virtual bool isBookExist(int bookId) const = 0;
+
+    virtual ~LibraryRepository() = default;
+
+
+};
+
+//Adapters
+
+class InMemoryLibraryRepository : public LibraryRepository {
+
+    Library &library;
+
+public:
+
+    InMemoryLibraryRepository(Library &lib) : library(lib) {}
+
+
+    void newBook(Book newBook) override {
+        bool repeatBookId = std::any_of(library.allBooks.begin(), library.allBooks.end(), [&](const Book &book) {
+            return book.bookID == newBook.bookID;
+        });
+
+        if (repeatBookId) {
+            throw std::runtime_error("error:declared book id");
+        } else {
+            library.allBooks.push_back(newBook);
         }
-        return false;
+
+    }
+
+    void newPatron(Patron newPatron) override {
+
+        bool repeatPatronId = std::any_of(library.allPatrons.begin(), library.allPatrons.end(),
+                                          [&](const Patron &patron) {
+                                              return patron.patronId == newPatron.patronId;
+                                          });
+
+        if (repeatPatronId) {
+            throw std::runtime_error("error:declared patron id");
+        } else {
+            library.allPatrons.emplace_back(newPatron);
+        }
+
+    }
+
+
+    Patron getPatron(int patronId) const override {
+        auto patron = std::find_if(library.allPatrons.begin(), library.allPatrons.end(), [&](const Patron &patron) {
+            return patron.patronId == patronId;
+        });
+        if (patron == library.allPatrons.end()) {
+            throw std::runtime_error("patron not found");
+        }
+        return *patron;
+    }
+
+
+    Book getBook(int bookId) const override {
+        auto book = std::find_if(library.allBooks.begin(), library.allBooks.end(), [&](const Book &book) {
+            return book.bookID == bookId;
+        });
+
+        if (book == library.allBooks.end())
+            throw std::runtime_error("book not found");
+
+        return *book;
+    }
+
+    bool isPatronExist(int patronId) const override {
+        return std::any_of(library.allPatrons.begin(), library.allPatrons.end(), [&](const Patron &patron) {
+            return patron.patronId == patronId;
+        });
+    }
+
+    bool isBookExist(int bookID) const override {
+        return std::any_of(library.allBooks.begin(), library.allBooks.end(), [&](const Book &book) {
+            return book.bookID == bookID;
+        });
+    }
+
+
+};
+
+class BorrowBookService {
+
+
+private:
+    Library &library;
+    LibraryRepository &libraryRepository;
+
+public:
+
+    BorrowBookService(Library &library, LibraryRepository &libRepository) : library(library),
+                                                                            libraryRepository(libRepository) {}
+
+    void borrowBook(int patronId, int bookId) {
+        BookPatronItem connect;
+        connect.bookId = bookId;
+        connect.patronId = patronId;
+
+        if (isBorrowedBook(bookId)) {
+            std::cerr << "book borrowed!" << std::endl;
+            return;
+        } else if (!libraryRepository.isPatronExist(patronId)) {
+            std::cerr << "patron not found!" << std::endl;
+            return;
+        } else if (!libraryRepository.isBookExist(bookId)) {
+            std::cerr << "book not found!" << std::endl;
+            return;
+        }
+
+        library.patronBorrowedBooks.emplace_back(connect);
+        std::cout << "##### Successfully #####" << std::endl;
+
+    }
+
+    bool isBorrowedBook(int bookId) {
+        auto begin = library.patronBorrowedBooks.begin();
+        auto end = library.patronBorrowedBooks.end();
+
+        return std::any_of(begin, end, [&](const BookPatronItem &bookPatronItem) {
+            return bookPatronItem.bookId == bookId;
+        });
     }
 };
-class library
-{
-    deque<Book> Available_books;
-    bool Is_borrowed_Book = false;
+
+// FrameWork
+
+class ConsoleUI {
+private:
+    Library &library;
+    LibraryRepository &libraryRepository;
 
 public:
-    library()
-    {
-        Available_books.push_back(Book("Amarita", "Omar AbdELhamid", 123));
-        Available_books.push_back(Book("Harry Potter", "Joanne Rowling", 456));
-        Available_books.push_back(Book("Sherlock Holmes", "Arthur Conan", 789));
-        Available_books.push_back(Book("Hoker", "Nicola Haddad", 101));
-    }
-    void ViewAvailableBooks()
-    {
-        cout << "The Available books are :" << endl;
-        for (auto showAvilabelBook : Available_books)
-        {
-            cout << "Book ID : " << showAvilabelBook.getBook_ID() << "  ,   Title : " << showAvilabelBook.getBookName() << "  ,   Author : " << showAvilabelBook.getBook_Author() << endl;
-        }
-    }
-} library_object;
-int main()
-{
-    cout << "HELLO !! " << endl;
-    library_object.ViewAvailableBooks();
-    patron patorn_data("Asil", 13305);
-    cout << "Is this your first time? (y , n)" << endl;
-    bool is_first_time = false;
-    char theAnswer;
-    cin >> theAnswer;
-    if (theAnswer == 'y')
-    {
-        is_first_time = true;
-    }
-    bool end_programe = false;
-    char answer_to_end_program;
-    while (!end_programe)
-    {
-        if (is_first_time)
-        {
-            string bookName, bookAuthor;
-            int bookID;
-            cout << "Enter Book Name: ";
-            cin.ignore();
-            getline(cin, bookName);
+    ConsoleUI(Library &lib, LibraryRepository &libraryRepository) : library(lib),
+                                                                    libraryRepository(libraryRepository) {}
 
-            cout << "Enter Book Author: ";
-            getline(cin, bookAuthor);
+    void printAllBook() {
 
-            cout << "Enter Book ID: ";
-            cin >> bookID;
+        std::cout << "Book List:";
 
-            Book wantedBook(bookName, bookAuthor, bookID);
-            patorn_data.borrowBook(wantedBook);
-            cout << "\nBook borrowed successfully." << endl;
-            cout << "Do you want to save changes ? (y , n)" << endl;
-            cin >> answer_to_end_program;
-            if (answer_to_end_program == 'y')
-            {
-                cout << "saved successfully";
-                end_programe = true;
-            }
+        if (library.allBooks.empty()) {
+            std::cout << "empty!" << std::endl;
+            return;
         }
-        if (is_first_time)
-        {
-            cout << "Enter the Book ID you want to check:\n ";
-            int wanted_book_ID;
-            cin >> wanted_book_ID;
-            if (patorn_data.isBorrowedBook(wanted_book_ID))
-            {
-                cout << "The book is borrowed now ." << endl;
-            }
-            else
-            {
-                cout << "The book is available." << endl;
-            }
-            cout << "Do you want to save changes ? (y , n)" << endl;
-            cin >> answer_to_end_program;
-            if (answer_to_end_program == 'y')
-            {
-                cout << "saved successfully";
-                end_programe = true;
-            }
+
+        for (const Book &book:library.allBooks) {
+            std::cout << std::endl << "[" << book.bookID << "] " << book.bookName << "-" << book.bookAuthor;
         }
-        else
-        {
-            cout << "Enter the Book ID you want to check:\n ";
-            int wanted_book_ID;
-            cin >> wanted_book_ID;
-            if (patorn_data.isBorrowedBook(wanted_book_ID))
-            {
-                cout << "The book is borrowed." << endl;
-            }
-            else
-            {
-                cout << "The book is available." << endl;
-            }
-        }
+        std::cout << std::endl;
     }
+
+    void printAllBorrowed() {
+
+
+        std::cout << "Borrow List:";
+
+        bool error = false;
+
+
+        if (library.patronBorrowedBooks.empty()) {
+            std::cerr << "Borrowed empty!" << std::endl;
+            error = true;
+        } else if (library.allBooks.empty()) {
+            std::cerr << "book empty!" << std::endl;
+            error = true;
+        } else if (library.allPatrons.empty()) {
+            std::cerr << "patron empty!" << std::endl;
+            error = true;
+        }
+
+        if (error)
+            return;
+
+        for (const BookPatronItem &bookPatronItem:library.patronBorrowedBooks) {
+            auto patron = libraryRepository.getPatron(bookPatronItem.patronId);
+            auto book = libraryRepository.getBook(bookPatronItem.bookId);
+            std::cout << "[" << patron.patronId << "]" << patron.patronName << " -> " << "[" << book.bookID << "]"
+                      << book.bookName << "-" << book.bookAuthor << std::endl;
+        }
+
+        std::cout << std::endl;
+    }
+
+
+    void printAllPatron() {
+        std::cout << "Patron List:";
+
+        if (library.allPatrons.empty()) {
+            std::cout << "empty!" << std::endl;
+            return;
+        }
+        std::cout << std::endl;
+
+        for (const Patron &patron:library.allPatrons) {
+            std::cout << std::endl << "[" << patron.patronId << "] " << patron.patronName;
+        }
+        std::cout << std::endl;
+    }
+
+    int generateBookId() const {
+        int maxId = 0;
+        for (const Book &book:library.allBooks) {
+            if (book.bookID > maxId)
+                maxId = book.bookID;
+
+        }
+        return maxId + 1;
+    };
+
+    int generatePatronId() const {
+        int maxId = 0;
+        for (const Patron &patron:library.allPatrons) {
+            if (patron.patronId > maxId)
+                maxId = patron.patronId;
+
+        }
+        return maxId + 1;
+    };
+};
+
+
+int main() {
+    Library library;
+    InMemoryLibraryRepository inMemoryLibraryRepository(library);
+    BorrowBookService borrowBookService(library, inMemoryLibraryRepository);
+    ConsoleUI consoleUI(library, inMemoryLibraryRepository);
+
+
+    //    Example Book
+
+    Book book1;
+    book1.bookID = 1;
+    book1.bookName = "The Old Man and the Sea";
+    book1.bookAuthor = "Ernest Hemingway";
+    inMemoryLibraryRepository.newBook(book1);
+
+    Book book2;
+    book2.bookID = 2;
+    book2.bookName = "Antifragile";
+    book2.bookAuthor = "Nassim Nicholas Taleb";
+    inMemoryLibraryRepository.newBook(book2);
+
+
+    Book book3;
+    book3.bookID = 3;
+    book3.bookName = "The Art of War";
+    book3.bookAuthor = "Sun Tzu";
+    inMemoryLibraryRepository.newBook(book3);
+
+
+    //    Example User
+
+    Patron p1;
+    p1.patronName = "Ali";
+    p1.patronId = 1;
+
+    Patron p2;
+    p2.patronName = "Sara";
+    p2.patronId = 2;
+
+    Patron p3;
+    p3.patronName = "Mina";
+    p3.patronId = 3;
+
+
+    while (true) {
+        std::cout << "________________________" << std::endl;
+        std::cout << "1.Add book to library" << std::endl;
+        std::cout << "2.Add patron" << std::endl;
+        std::cout << "3.Show All Book" << std::endl;
+        std::cout << "4.Show All Patron" << std::endl;
+        std::cout << "5.Borrow book" << std::endl;
+        std::cout << "6.Show all borrowed books" << std::endl;
+        std::cout << "7.Exit" << std::endl;
+
+        short choice;
+        std::cout << "choice:";
+        std::cin >> choice;
+
+        try {
+            switch (choice) {
+
+                case 1: {
+                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+                    Book newBook;
+                    std::string bookIdStr;
+
+                    std::cout << "enter book name:";
+                    std::getline(std::cin, newBook.bookName);
+
+                    std::cout << "enter book author:";
+                    std::getline(std::cin, newBook.bookAuthor);
+
+                    std::cout << "enter book code[generate=g]:";
+                    std::cin >> bookIdStr;
+
+                    if (bookIdStr == "g") {
+                        newBook.bookID = consoleUI.generateBookId();
+                    } else {
+                        try {
+                            newBook.bookID = std::stoi(bookIdStr);
+
+
+                        } catch (std::exception &exception) {
+                            std::cerr << exception.what() << "\n";
+                            break;
+                        }
+                    }
+
+
+                    inMemoryLibraryRepository.newBook(newBook);
+
+                    std::cout << "##### successfully #####";
+                    std::cout << std::endl;
+                    std::cout << std::endl;
+
+
+                    break;
+                }
+
+                case 2: {
+                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                    std::string patronIdStr;
+
+
+                    Patron newPatron;
+
+                    std::cout << "enter patron name:";
+                    std::cin >> newPatron.patronName;
+
+                    std::cout << "enter patron id[generate:g]:";
+                    std::cin >> patronIdStr;
+
+                    if (patronIdStr == "g") {
+                        newPatron.patronId = consoleUI.generatePatronId();
+                    } else {
+                        try {
+                            newPatron.patronId = std::stoi(patronIdStr);
+
+
+                        } catch (std::exception &exception) {
+                            std::cerr << exception.what() << "\n";
+                            break;
+                        }
+                    }
+
+
+                    inMemoryLibraryRepository.newPatron(newPatron);
+                    break;
+                }
+
+                case 3:
+                    consoleUI.printAllBook();
+                    break;
+
+                case 4:
+                    consoleUI.printAllPatron();
+                    break;
+                case 5: {
+                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+                    int patronId, bookId;
+
+                    std::cout << "enter patron id:";
+                    std::cin >> patronId;
+
+                    std::cout << "enter book id:";
+                    std::cin >> bookId;
+
+                    std::cout << std::endl;
+
+                    try {
+                        borrowBookService.borrowBook(patronId, bookId);
+
+                    } catch (std::exception &exception) {
+                        std::cerr << exception.what() << std::endl;
+                    }
+                    break;
+                }
+
+                case 6:
+
+                    try {
+                        consoleUI.printAllBorrowed();
+
+                    } catch (std::exception &exception) {
+                        std::cerr << exception.what() << std::endl;
+                    }
+
+                    break;
+
+                case 7:
+                    return 0;
+
+                default:
+                    throw std::runtime_error("number not range");
+            }
+
+        } catch (std::string &errorText) {
+            std::cout << errorText << std::endl;
+        } catch (std::exception &exception) {
+            std::cerr << exception.what() << std::endl;
+        } catch (...) {
+            std::cerr << "other error" << std::endl;
+        }
+
+
+    }
+
 }
