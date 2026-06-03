@@ -1,19 +1,7 @@
-# Library Management System
+# Library Management System (C++)
 
-A simple console-based library management system written in C++.
-
-This project manages:
-- books
-- patrons
-- borrowing records
-
-It is designed with a cleaner structure by separating:
-- entities
-- repository layer
-- service layer
-- console UI
-
----
+A simple **Library Management System** written in **C++**, designed to manage books and patrons in a small library.  
+The project is structured using **Clean Architecture principles** to keep the code modular, maintainable, and easy to extend.
 
 ## Features
 
@@ -27,45 +15,79 @@ It is designed with a cleaner structure by separating:
 - Prevent duplicate IDs
 - Validate missing books or patrons before borrowing
 
----
+## Architecture
 
-## Project Structure
+This project follows a simplified **Clean Architecture** structure.  
+The goal is to separate business logic from frameworks, UI, and infrastructure.
 
-The code is organized into several logical parts:
+Main layers:
 
-### Entities
-Basic data models:
-- `Book`
-- `Patron`
-- `BookPatronItem`
-- `Library`
+- **Entities**  
+  Core domain objects such as books and patrons.
 
-### Repository
-Abstract data-access layer:
-- `LibraryRepository`
+- **Use Cases / Application Logic**  
+  Handles operations like borrowing books and managing records.
 
-Concrete implementation:
-- `InMemoryLibraryRepository`
+- **Adapters**  
+  Connects the application logic with external layers (CLI, controllers, etc.).
 
-### Service
-Application logic:
-- `BorrowBookService`
+- **Infrastructure**  
+  Handles persistence and implementation details such as data storage.
 
-### UI
-Console interaction and display:
-- `ConsoleUI`
+Example structure:
+src
+├── adapters
+├── application
+├── entities
+└── infrastructure
 
----
 
-## Technologies Used
+## Requirements
 
-- C++
-- STL (`vector`, `algorithm`, `string`, `iostream`, `limits`)
+- C++17 or newer
+- CMake (version 3.17 or newer)
+- A C++ compiler (GCC, Clang, or MSVC)
 
----
+## Build and Run
 
-## How to Build
-
-Compile using `g++`:
+### 1. Clone the repository
 ```bash
-g++ -std=c++17 library.cpp -o library_app
+git clone https://github.com/cartel-developer/cpp-book-borrowing-system.git
+cd library-management-system
+```
+
+### 2.Create a build directory
+```bash
+mkdir build
+cd build
+```
+
+### 3. Generate build files with CMake
+```bash
+cmake ..
+```
+
+### 4.Build the project
+```bash
+cmake --build .
+```
+
+### 5. Run the program
+After building, run the generated executable:
+```bash
+./Library
+```
+
+## Purpose of the Project
+
+This project was created as a **practice implementation of Clean Architecture in C++**, demonstrating how to organize a software project while keeping domain logic independent from infrastructure and external frameworks.
+
+## Possible Future Improvements
+
+* **Persistent Storage:** Implement file-based or database storage (e.g., SQLite) to save data between sessions.
+* **Return Functionality:** Add the ability for patrons to return borrowed books.
+* **Search Engine:** Add search functionality to find books by title/author or patrons by name/ID.
+* **Unit Testing:** Implement a testing suite (using GTest or Catch2) to ensure the stability of the core business logic.
+* **API Interface:** Expose the library services through a REST API to allow for web or mobile frontend integration.
+
+
