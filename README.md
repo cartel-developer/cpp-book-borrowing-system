@@ -34,14 +34,6 @@ Main layers:
 - **Infrastructure**  
   Handles persistence and implementation details such as data storage.
 
-Example structure:
-src
-├── adapters
-├── application
-├── entities
-└── infrastructure
-
-
 ## Requirements
 
 - C++17 or newer
